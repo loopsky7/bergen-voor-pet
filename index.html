@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bergen voor pet</title>
+<!--
+  ============================================================
+  Bergen voor pet — één bestand, alleen scrollen.
+
+  De beroemdste bergen ter wereld verschijnen automatisch met hun
+  naam, land en hoogte. Mont Blanc staat bovenaan (daar heeft pet op
+  de top gestaan). De lijst wordt live opgehaald uit Wikidata en daarna
+  op dit toestel bewaard, zodat de pagina de volgende keer meteen laadt.
+
+  Geen knoppen, geen links: er kan niets per ongeluk worden aangeklikt
+  of verwijderd. Alleen scrollen.
+  ============================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #16202B;      /* dusk-blue mountain sky */
+    --snow:  #F3F1EC;      /* snowfield white */
+    --mist:  #9FAAB8;      /* soft caption grey-blue */
+    --glow:  #D9A66C;      /* faint alpenglow, used once */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: var(--night);
+    color: var(--snow);
+    font-family: "Source Sans 3", sans-serif;
+    /* Nothing on this page can be selected, dragged, or long-pressed */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior-y: none;
+  }
+
+  header {
+    text-align: center;
+    padding: 12vh 24px 9vh;
+  }
+  header .rule {
+    width: 56px; height: 2px;
+    background: var(--glow);
+    margin: 0 auto 28px;
+  }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 600;
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    letter-spacing: 0.01em;
+  }
+  header p {
+    margin-top: 14px;
+    color: var(--mist);
+    font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+  }
+
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 16px 10vh;
+  }
+  figure {
+    margin: 0 0 9vh;
+  }
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    background: #0E141C;
+    /* Taps on photos do absolutely nothing */
+    pointer-events: none;
+  }
+  figcaption {
+    font-family: "Fraunces", serif;
+    font-size: clamp(1.1rem, 3vw, 1.35rem);
+    color: var(--mist);
+    text-align: center;
+    padding-top: 16px;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--mist);
+    font-family: "Fraunces", serif;
+    font-size: 1.25rem;
+    padding: 4vh 24px 14vh;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    figure { opacity: 0; transform: translateY(14px); transition: opacity .9s ease, transform .9s ease; }
+    figure.shown { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body oncontextmenu="return false">
+
+<header>
+  <div class="rule"></div>
+  <h1>Bergen voor pet</h1>
+  <p>Met veel liefde, van heel je familie</p>
+</header>
+
+<main id="album"></main>
+
+<footer>Tot op de top, en nog verder ⛰</footer>
+
+<script>
+/* ============================================================
+   1) Mont Blanc staat altijd bovenaan, met de eigen woorden van
+      de familie. Daarna een handvol bekende bergen als "vangnet",
+      zodat er meteen iets te zien is terwijl de volledige lijst
+      (honderden bergen) uit Wikidata wordt opgehaald.
+   ============================================================ */
+const MONT_BLANC = {
+  src: "https://commons.wikimedia.org/wiki/Special:FilePath/Mont%20Blanc%20100%200068.JPG?width=1400",
+  caption: "Mont Blanc, Frankrijk/Italië — 4.806 m. Het dak van West-Europa. Hier heeft onze pet op de top gestaan!"
+};
+
+const FALLBACK = [
+  MONT_BLANC,
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Matterhorn%20reflection.jpg?width=1400",
+    caption: "De Matterhorn, Zwitserland — 4.478 m, weerspiegeld in de Riffelsee" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Everest%2C%20Nepal%2C%20Himalayas.jpg?width=1400",
+    caption: "Mount Everest, Nepal/Tibet — 8.849 m, de hoogste berg ter wereld" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/K2%208611.jpg?width=1400",
+    caption: "K2, Pakistan/China — 8.611 m, de op één na hoogste berg ter wereld" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Kilimanjaro.jpg?width=1600",
+    caption: "Kilimanjaro, Tanzania — 5.895 m, het dak van Afrika" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Lake%20Kawaguchiko%20Sakura%20Mount%20Fuji%204.JPG?width=1400",
+    caption: "Mount Fuji, Japan — 3.776 m" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Eiger%2CM%C3%B6nch%2CJungfrau2.JPG?width=1400",
+    caption: "Eiger, Mönch en Jungfrau, Zwitserland" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Ama%20Dablam%20from%20Kala%20Patthar.jpg?width=1400",
+    caption: "Ama Dablam, Nepal — 6.812 m" },
+  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Drei%20Zinnen%20Tre%20Cime%20di%20Lavaredo%20Dolomites.jpg?width=1400",
+    caption: "Tre Cime di Lavaredo, Dolomieten, Italië — 2.999 m" },
+];
+
+/* ============================================================
+   2) Tekenen van de galerij. Wordt opnieuw aangeroepen zodra de
+      volledige lijst binnen is; oude foto's worden dan vervangen.
+   ============================================================ */
+const album = document.getElementById("album");
+let observer = null;
+
+function render(list) {
+  if (observer) observer.disconnect();
+  album.textContent = "";
+
+  for (const photo of list) {
+    const fig = document.createElement("figure");
+    const img = document.createElement("img");
+    img.src = photo.src;
+    img.alt = photo.caption || "Berg";
+    img.loading = "lazy";        // foto's laden pas bij het scrollen — honderden blijven snel
+    img.draggable = false;
+    img.addEventListener("error", () => { fig.remove(); }); // stille foto's weglaten
+    fig.appendChild(img);
+    if (photo.caption) {
+      const cap = document.createElement("figcaption");
+      cap.textContent = photo.caption;
+      fig.appendChild(cap);
+    }
+    album.appendChild(fig);
+  }
+
+  observer = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) e.target.classList.add("shown");
+  }, { rootMargin: "80px" });
+  document.querySelectorAll("figure").forEach(f => observer.observe(f));
+}
+
+/* ============================================================
+   3) De beroemdste bergen ophalen uit Wikidata (rechtstreeks in
+      de browser — Wikidata staat dit toe). Gesorteerd op
+      bekendheid; met naam, land, hoogte en eigen foto.
+   ============================================================ */
+const CACHE_KEY = "bergen_voor_pet_v1";
+const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 30; // 30 dagen
+
+const SPARQL = `
+SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
+  {
+    SELECT ?m ?fame
+           (MAX(?elev) AS ?elevation)
+           (SAMPLE(?img) AS ?image)
+           (SAMPLE(?c)   AS ?country)
+    WHERE {
+      VALUES ?root { wd:Q8502 wd:Q8072 }
+      ?m wdt:P31/wdt:P279* ?root .
+      ?m wdt:P2044 ?elev .
+      ?m wdt:P18   ?img .
+      ?m wikibase:sitelinks ?fame .
+      OPTIONAL { ?m wdt:P17 ?c . }
+    }
+    GROUP BY ?m ?fame
+    ORDER BY DESC(?fame)
+    LIMIT 500
+  }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }
+}
+ORDER BY DESC(?fame)`;
+
+function nlHeight(m) {
+  return String(Math.round(m)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function toPhoto(b) {
+  const name = (b.mLabel && b.mLabel.value || "").trim();
+  if (!name || /^Q\d+$/.test(name)) return null;
+  const elev = Math.round(parseFloat(b.elevation && b.elevation.value));
+  if (!(elev >= 100 && elev <= 9000)) return null;
+  const image = b.image && b.image.value;
+  if (!image) return null;
+  const country = (b.countryLabel && b.countryLabel.value || "").trim();
+  const src = image.replace(/^http:/, "https:") + (image.indexOf("?") >= 0 ? "&" : "?") + "width=1400";
+  const caption = (country && !/^Q\d+$/.test(country))
+    ? `${name}, ${country} — ${nlHeight(elev)} m`
+    : `${name} — ${nlHeight(elev)} m`;
+  return { src, caption, key: name.toLowerCase() };
+}
+
+async function fetchFromWikidata() {
+  const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(SPARQL);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  let rows;
+  try {
+    const res = await fetch(url, { headers: { "Accept": "application/sparql-results+json" }, signal: controller.signal });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    rows = (await res.json()).results.bindings;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const photos = [MONT_BLANC];
+  const seen = new Set(["mont blanc"]);
+  for (const b of rows) {
+    const p = toPhoto(b);
+    if (!p) continue;
+    if (seen.has(p.key) || p.key.indexOf("mont blanc") >= 0) continue;
+    seen.add(p.key);
+    photos.push({ src: p.src, caption: p.caption });
+  }
+  return photos;
+}
+
+function loadCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    if (c && Array.isArray(c.list) && c.list.length > 40 && (Date.now() - c.t) < CACHE_MAX_AGE) return c.list;
+  } catch (e) {}
+  return null;
+}
+
+async function start() {
+  const cached = loadCache();
+  render(cached || FALLBACK);   // meteen iets tonen
+  if (cached) return;           // recente lijst? klaar, geen netwerk nodig
+
+  try {
+    const list = await fetchFromWikidata();
+    if (list.length > 40) {
+      render(list);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
+    }
+  } catch (e) {
+    /* Wikidata even niet bereikbaar — het vangnet blijft staan. */
+  }
+}
+
+start();
+</script>
+</body>
+</html>
