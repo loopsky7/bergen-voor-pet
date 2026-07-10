@@ -1,7 +1,7 @@
-08:53:50 Lichte query (poging 1) ...
-08:53:58 Wikidata gaf 6028 rijen
-08:53:58 4582 unieke bergen
-08:54:07 2659 labels opgehaald in 11 porties
-08:54:07 2478 bergen met naam en hoogte
-08:54:28 steekproef: 10/30 foto's ok; statuscodes: {200: 10, 429: 20}
-08:54:28 photos.js geschreven met 2479 bergen.
+09:13:26 Lichte query (poging 1) ...
+09:13:32 Wikidata gaf 6028 rijen
+09:13:32 4582 unieke bergen
+09:13:44 2659 labels opgehaald in 11 porties
+09:13:44 2476 bergen met naam en hoogte
+09:14:01 steekproef: 12/30 foto's ok; statuscodes: {200: 12, 429: 18}
+09:14:01 photos.js geschreven met 2477 bergen.
