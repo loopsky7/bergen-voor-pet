@@ -21,10 +21,16 @@ jobs:
       - name: Bergen ophalen uit Wikidata en elke foto controleren
         run: |
           python3 - <<'PY'
-          import json, sys, urllib.request, urllib.parse
+          import json, sys, time, traceback, urllib.request, urllib.parse, urllib.error
           from concurrent.futures import ThreadPoolExecutor
 
-          UA = {"User-Agent": "bergen-voor-pet/1.0 (https://github.com/loopsky7/bergen-voor-pet)",
+          LOG = []
+          def log(msg):
+              line = time.strftime("%H:%M:%S ") + str(msg)
+              print(line, flush=True)
+              LOG.append(line)
+
+          UA = {"User-Agent": "bergen-voor-pet/1.0 (https://github.com/loopsky7/bergen-voor-pet; contact via repo)",
                 "Accept": "application/sparql-results+json"}
 
           MONT_BLANC = {
@@ -59,81 +65,104 @@ jobs:
                    ("wd:Q8502", 25, 400)]
 
           def query(q):
-              url = "https://query.wikidata.org/sparql?format=json&query=" + urllib.parse.quote(q)
-              req = urllib.request.Request(url, headers=UA)
-              with urllib.request.urlopen(req, timeout=120) as r:
+              data = urllib.parse.urlencode({"format": "json", "query": q}).encode()
+              req = urllib.request.Request("https://query.wikidata.org/sparql",
+                                           data=data, headers=UA, method="POST")
+              with urllib.request.urlopen(req, timeout=180) as r:
                   return json.load(r)["results"]["bindings"]
 
-          rows = []
-          for classes, fame, limit in TIERS:
-              try:
-                  rows = query(sparql(classes, fame, limit))
-                  print(f"Wikidata gaf {len(rows)} rijen (limit {limit})")
-                  if len(rows) > 100:
-                      break
-              except Exception as e:
-                  print(f"poging (limit {limit}) mislukt: {e}", file=sys.stderr)
+          def main():
+              rows = []
+              for classes, fame, limit in TIERS:
+                  try:
+                      log(f"Wikidata bevragen (limit {limit}, fame>={fame}) ...")
+                      rows = query(sparql(classes, fame, limit))
+                      log(f"Wikidata gaf {len(rows)} rijen")
+                      if len(rows) > 100:
+                          break
+                  except urllib.error.HTTPError as e:
+                      body = ""
+                      try: body = e.read()[:500].decode("utf-8", "replace")
+                      except Exception: pass
+                      log(f"poging (limit {limit}) HTTP {e.code}: {e.reason} | {body}")
+                  except Exception as e:
+                      log(f"poging (limit {limit}) mislukt: {type(e).__name__}: {e}")
+                  time.sleep(5)
 
-          def nl(n):
-              return f"{n:,}".replace(",", ".")
+              def nl(n):
+                  return f"{n:,}".replace(",", ".")
 
-          entries, seen = [], {"mont blanc"}
-          for b in rows:
-              name = b.get("mLabel", {}).get("value", "").strip()
-              if not name or (name.startswith("Q") and name[1:].isdigit()):
-                  continue
-              key = name.lower()
-              if key in seen or "mont blanc" in key:
-                  continue
-              try:
-                  elev = round(float(b["elevation"]["value"]))
-              except Exception:
-                  continue
-              if not (100 <= elev <= 9000):
-                  continue
-              img = b.get("image", {}).get("value")
-              if not img:
-                  continue
-              country = b.get("countryLabel", {}).get("value", "").strip()
-              if country.startswith("Q") and country[1:].isdigit():
-                  country = ""
-              src = img.replace("http://", "https://", 1)
-              src += ("&" if "?" in src else "?") + "width=1400"
-              cap = f"{name}, {country} — {nl(elev)} m" if country else f"{name} — {nl(elev)} m"
-              entries.append({"src": src, "caption": cap})
-              seen.add(key)
+              entries, seen = [], {"mont blanc"}
+              for b in rows:
+                  name = b.get("mLabel", {}).get("value", "").strip()
+                  if not name or (name.startswith("Q") and name[1:].isdigit()):
+                      continue
+                  key = name.lower()
+                  if key in seen or "mont blanc" in key:
+                      continue
+                  try:
+                      elev = round(float(b["elevation"]["value"]))
+                  except Exception:
+                      continue
+                  if not (100 <= elev <= 9000):
+                      continue
+                  img = b.get("image", {}).get("value")
+                  if not img:
+                      continue
+                  country = b.get("countryLabel", {}).get("value", "").strip()
+                  if country.startswith("Q") and country[1:].isdigit():
+                      country = ""
+                  src = img.replace("http://", "https://", 1)
+                  src += ("&" if "?" in src else "?") + "width=1400"
+                  cap = f"{name}, {country} — {nl(elev)} m" if country else f"{name} — {nl(elev)} m"
+                  entries.append({"src": src, "caption": cap})
+                  seen.add(key)
 
-          print(f"{len(entries)} bergen na filteren; foto's controleren …")
+              log(f"{len(entries)} bergen na filteren; foto's controleren ...")
 
-          def check(e):
-              try:
-                  req = urllib.request.Request(e["src"], headers={"User-Agent": UA["User-Agent"]}, method="HEAD")
-                  with urllib.request.urlopen(req, timeout=20) as r:
-                      return e if r.status == 200 else None
-              except Exception:
-                  return None
+              def check(e):
+                  try:
+                      req = urllib.request.Request(e["src"], headers={"User-Agent": UA["User-Agent"]}, method="HEAD")
+                      with urllib.request.urlopen(req, timeout=25) as r:
+                          return e if r.status == 200 else None
+                  except Exception:
+                      return None
 
-          with ThreadPoolExecutor(max_workers=12) as ex:
-              checked = [e for e in ex.map(check, entries) if e]
+              checked = []
+              if entries:
+                  with ThreadPoolExecutor(max_workers=12) as ex:
+                      checked = [e for e in ex.map(check, entries) if e]
+              log(f"{len(checked)} foto's bestaan echt ({len(entries) - len(checked)} afgekeurd)")
 
-          print(f"{len(checked)} foto's bestaan echt ({len(entries) - len(checked)} afgekeurd)")
+              photos = [MONT_BLANC] + checked
+              if len(photos) < 100:
+                  log(f"Slechts {len(photos)} bergen — photos.js wordt NIET geschreven.")
+                  return
 
-          photos = [MONT_BLANC] + checked
-          if len(photos) < 100:
-              print("Te weinig bergen; photos.js blijft ongewijzigd.", file=sys.stderr)
-              sys.exit(0)
+              with open("photos.js", "w", encoding="utf-8") as f:
+                  f.write("/* Automatisch opgebouwd door .github/workflows/bergen.yml — niet met de hand bewerken. */\n")
+                  f.write("window.PHOTOS = ")
+                  json.dump(photos, f, ensure_ascii=False, indent=1)
+                  f.write(";\n")
+              log(f"photos.js geschreven met {len(photos)} bergen.")
 
-          with open("photos.js", "w", encoding="utf-8") as f:
-              f.write("/* Automatisch opgebouwd door .github/workflows/bergen.yml — niet met de hand bewerken. */\n")
-              f.write("window.PHOTOS = ")
-              json.dump(photos, f, ensure_ascii=False, indent=1)
-              f.write(";\n")
-          print(f"photos.js geschreven met {len(photos)} bergen.")
+          try:
+              main()
+          except Exception:
+              log("ONVERWACHTE FOUT:\n" + traceback.format_exc())
+
+          with open("bouwlog.txt", "w", encoding="utf-8") as f:
+              f.write("\n".join(LOG) + "\n")
           PY
 
-      - name: photos.js vastleggen
+      - name: Resultaat vastleggen
+        if: always()
         run: |
           git config user.name "bergen-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add photos.js
-          git diff --cached --quiet || (git commit -m "Bergenlijst bijgewerkt" && git push)
+          if [ -f photos.js ]; then git add photos.js; fi
+          if [ -f bouwlog.txt ]; then git add bouwlog.txt; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Bergenlijst bijgewerkt"
+            git push
+          fi
