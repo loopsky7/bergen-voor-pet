@@ -92,6 +92,12 @@
     font-size: 1.25rem;
     padding: 4vh 24px 14vh;
   }
+  #teller {
+    margin-top: 18px;
+    font-family: "Source Sans 3", sans-serif;
+    font-size: 0.95rem;
+    opacity: 0.75;
+  }
 
   @media (prefers-reduced-motion: no-preference) {
     figure { opacity: 0; transform: translateY(14px); transition: opacity .9s ease, transform .9s ease; }
@@ -109,7 +115,7 @@
 
 <main id="album"></main>
 
-<footer>Tot op de top, en nog verder ⛰</footer>
+<footer>Tot op de top, en nog verder ⛰<div id="teller"></div></footer>
 
 <script>
 /* ============================================================
@@ -175,6 +181,9 @@ function render(list) {
     for (const e of entries) if (e.isIntersecting) e.target.classList.add("shown");
   }, { rootMargin: "80px" });
   document.querySelectorAll("figure").forEach(f => observer.observe(f));
+
+  /* Klein tellertje onderaan: zo zie je hoeveel bergen er geladen zijn. */
+  document.getElementById("teller").textContent = nlHeight(list.length) + " bergen";
 }
 
 /* ============================================================
@@ -182,10 +191,11 @@ function render(list) {
       de browser — Wikidata staat dit toe). Gesorteerd op
       bekendheid; met naam, land, hoogte en eigen foto.
    ============================================================ */
-const CACHE_KEY = "bergen_voor_pet_v2";
+const CACHE_KEY = "bergen_voor_pet_v3";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 30; // 30 dagen
 
-const SPARQL = `
+function sparqlFor(limit) {
+  return `
 SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
   {
     SELECT ?m ?fame
@@ -202,11 +212,12 @@ SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
     }
     GROUP BY ?m ?fame
     ORDER BY DESC(?fame)
-    LIMIT 3000
+    LIMIT ${limit}
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }
 }
 ORDER BY DESC(?fame)`;
+}
 
 function nlHeight(m) {
   return String(Math.round(m)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -227,8 +238,8 @@ function toPhoto(b) {
   return { src, caption, key: name.toLowerCase() };
 }
 
-async function fetchFromWikidata() {
-  const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(SPARQL);
+async function fetchFromWikidata(limit) {
+  const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(sparqlFor(limit));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   let rows;
@@ -265,14 +276,18 @@ async function start() {
   render(cached || FALLBACK);   // meteen iets tonen
   if (cached) return;           // recente lijst? klaar, geen netwerk nodig
 
-  try {
-    const list = await fetchFromWikidata();
-    if (list.length > 40) {
-      render(list);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
+  /* Eerst de grote lijst proberen; lukt dat niet, dan een kleinere. */
+  for (const limit of [3000, 800]) {
+    try {
+      const list = await fetchFromWikidata(limit);
+      if (list.length > 40) {
+        render(list);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
+        return;
+      }
+    } catch (e) {
+      /* volgende poging, of het vangnet blijft staan */
     }
-  } catch (e) {
-    /* Wikidata even niet bereikbaar — het vangnet blijft staan. */
   }
 }
 
