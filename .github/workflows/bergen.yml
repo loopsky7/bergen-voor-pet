@@ -169,8 +169,11 @@ jobs:
               if len(photos) < 100:
                   log(f"Slechts {len(photos)} bergen — photos.js wordt NIET geschreven.")
                   return
-              if len(sample) >= 20 and ok < len(sample) * 0.5:
-                  log("Steekproef te slecht — photos.js wordt NIET geschreven.")
+              # Alleen echte 404's (foto bestaat niet) tellen tegen; 429
+              # betekent slechts "te snel gevraagd" en zegt niets over de foto.
+              n404 = statussen.get(404, 0)
+              if len(sample) >= 20 and n404 > len(sample) * 0.5:
+                  log("Meerderheid van steekproef is 404 — photos.js wordt NIET geschreven.")
                   return
 
               with open("photos.js", "w", encoding="utf-8") as f:
