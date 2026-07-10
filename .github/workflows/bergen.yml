@@ -18,10 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Bergen ophalen uit Wikidata en elke foto controleren
+      - name: Bergen ophalen uit Wikidata (v3)
         run: |
           python3 - <<'PY'
-          import json, sys, time, traceback, urllib.request, urllib.parse, urllib.error
+          import json, random, sys, time, traceback, urllib.request, urllib.parse, urllib.error
           from concurrent.futures import ThreadPoolExecutor
 
           LOG = []
@@ -38,105 +38,139 @@ jobs:
               "caption": "Mont Blanc, Frankrijk/Italië — 4.806 m. Het dak van West-Europa. Hier heeft onze pet op de top gestaan!",
           }
 
-          def sparql(classes, min_fame, limit):
-              return f"""
-          SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {{
-            {{
-              SELECT ?m ?fame (MAX(?elev) AS ?elevation)
-                     (SAMPLE(?img) AS ?image) (SAMPLE(?c) AS ?country) WHERE {{
-                VALUES ?class {{ {classes} }}
-                ?m wdt:P31 ?class .
-                ?m wikibase:sitelinks ?fame .
-                FILTER(?fame >= {min_fame})
-                ?m wdt:P2044 ?elev .
-                ?m wdt:P18   ?img .
-                OPTIONAL {{ ?m wdt:P17 ?c . }}
-              }}
-              GROUP BY ?m ?fame
-              ORDER BY DESC(?fame)
-              LIMIT {limit}
-            }}
-            SERVICE wikibase:label {{ bd:serviceParam wikibase:language "nl,en". }}
-          }}
-          ORDER BY DESC(?fame)"""
-
-          TIERS = [("wd:Q8502 wd:Q8072 wd:Q169358", 4, 3000),
-                   ("wd:Q8502 wd:Q8072", 10, 1200),
-                   ("wd:Q8502", 25, 400)]
-
-          def query(q):
+          def query(q, timeout=170):
               data = urllib.parse.urlencode({"format": "json", "query": q}).encode()
               req = urllib.request.Request("https://query.wikidata.org/sparql",
                                            data=data, headers=UA, method="POST")
-              with urllib.request.urlopen(req, timeout=180) as r:
+              with urllib.request.urlopen(req, timeout=timeout) as r:
                   return json.load(r)["results"]["bindings"]
 
+          def qid(iri):
+              return iri.rsplit("/", 1)[-1]
+
+          def nl(n):
+              return f"{n:,}".replace(",", ".")
+
           def main():
+              # Stap 1: lichte query — GEEN sortering, GEEN groepering, GEEN labels.
+              # Dat zijn precies de dingen waar Wikidata op een timeout liep.
+              light = """
+              SELECT ?m ?fame ?elev ?img ?c WHERE {
+                VALUES ?class { wd:Q8502 wd:Q8072 wd:Q169358 }
+                ?m wdt:P31 ?class .
+                ?m wikibase:sitelinks ?fame .
+                FILTER(?fame >= 10)
+                ?m wdt:P2044 ?elev .
+                ?m wdt:P18 ?img .
+                OPTIONAL { ?m wdt:P17 ?c . }
+              } LIMIT 12000"""
               rows = []
-              for classes, fame, limit in TIERS:
+              for attempt in (1, 2):
                   try:
-                      log(f"Wikidata bevragen (limit {limit}, fame>={fame}) ...")
-                      rows = query(sparql(classes, fame, limit))
+                      log(f"Lichte query (poging {attempt}) ...")
+                      rows = query(light)
                       log(f"Wikidata gaf {len(rows)} rijen")
-                      if len(rows) > 100:
-                          break
+                      break
                   except urllib.error.HTTPError as e:
                       body = ""
-                      try: body = e.read()[:500].decode("utf-8", "replace")
+                      try: body = e.read()[:300].decode("utf-8", "replace")
                       except Exception: pass
-                      log(f"poging (limit {limit}) HTTP {e.code}: {e.reason} | {body}")
+                      log(f"HTTP {e.code}: {e.reason} | {body}")
                   except Exception as e:
-                      log(f"poging (limit {limit}) mislukt: {type(e).__name__}: {e}")
-                  time.sleep(5)
+                      log(f"mislukt: {type(e).__name__}: {e}")
+                  time.sleep(10)
 
-              def nl(n):
-                  return f"{n:,}".replace(",", ".")
-
-              entries, seen = [], {"mont blanc"}
+              # Stap 2: per berg samenvoegen (hoogste hoogte, eerste foto, land, fame)
+              bergen = {}
               for b in rows:
-                  name = b.get("mLabel", {}).get("value", "").strip()
+                  try:
+                      m = qid(b["m"]["value"])
+                      fame = int(b["fame"]["value"])
+                      elev = round(float(b["elev"]["value"]))
+                      img = b["img"]["value"]
+                  except Exception:
+                      continue
+                  if not (100 <= elev <= 9000):
+                      continue
+                  e = bergen.setdefault(m, {"fame": fame, "elev": elev, "img": img, "land": None})
+                  e["elev"] = max(e["elev"], elev)
+                  c = b.get("c", {}).get("value")
+                  if c and not e["land"]:
+                      e["land"] = qid(c)
+              log(f"{len(bergen)} unieke bergen")
+              top = sorted(bergen.items(), key=lambda kv: -kv[1]["fame"])[:2500]
+
+              # Stap 3: namen ophalen in kleine, goedkope porties (VALUES + labels)
+              need = [m for m, _ in top]
+              landen = sorted({e["land"] for _, e in top if e["land"]})
+              labels = {}
+              def fetch_labels(ids):
+                  vals = " ".join("wd:" + i for i in ids)
+                  q = f"""SELECT ?x ?xLabel WHERE {{ VALUES ?x {{ {vals} }}
+                          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "nl,en". }} }}"""
+                  for b in query(q, timeout=60):
+                      labels[qid(b["x"]["value"])] = b.get("xLabel", {}).get("value", "")
+              batch = 250
+              alle_ids = need + landen
+              for i in range(0, len(alle_ids), batch):
+                  ids = alle_ids[i:i+batch]
+                  for attempt in (1, 2):
+                      try:
+                          fetch_labels(ids)
+                          break
+                      except Exception as e:
+                          log(f"labelportie {i//batch+1} poging {attempt} mislukt: {e}")
+                          time.sleep(8)
+              log(f"{len(labels)} labels opgehaald in {(len(alle_ids)+batch-1)//batch} porties")
+
+              # Stap 4: bijschriften bouwen
+              entries, seen = [], {"mont blanc"}
+              for m, e in top:
+                  name = labels.get(m, "").strip()
                   if not name or (name.startswith("Q") and name[1:].isdigit()):
                       continue
                   key = name.lower()
                   if key in seen or "mont blanc" in key:
                       continue
-                  try:
-                      elev = round(float(b["elevation"]["value"]))
-                  except Exception:
-                      continue
-                  if not (100 <= elev <= 9000):
-                      continue
-                  img = b.get("image", {}).get("value")
-                  if not img:
-                      continue
-                  country = b.get("countryLabel", {}).get("value", "").strip()
-                  if country.startswith("Q") and country[1:].isdigit():
-                      country = ""
-                  src = img.replace("http://", "https://", 1)
+                  land = labels.get(e["land"], "") if e["land"] else ""
+                  if land.startswith("Q") and land[1:].isdigit():
+                      land = ""
+                  src = e["img"].replace("http://", "https://", 1)
                   src += ("&" if "?" in src else "?") + "width=1400"
-                  cap = f"{name}, {country} — {nl(elev)} m" if country else f"{name} — {nl(elev)} m"
+                  cap = f"{name}, {land} — {nl(e['elev'])} m" if land else f"{name} — {nl(e['elev'])} m"
                   entries.append({"src": src, "caption": cap})
                   seen.add(key)
+              log(f"{len(entries)} bergen met naam en hoogte")
 
-              log(f"{len(entries)} bergen na filteren; foto's controleren ...")
-
+              # Stap 5: steekproef van foto's (beleefd, niet hameren).
+              # P18-foto's uit Wikidata bestaan vrijwel altijd; kapotte
+              # verdwijnen bovendien vanzelf op de pagina.
+              sample = random.sample(entries, min(30, len(entries)))
+              statussen = {}
               def check(e):
                   try:
                       req = urllib.request.Request(e["src"], headers={"User-Agent": UA["User-Agent"]}, method="HEAD")
                       with urllib.request.urlopen(req, timeout=25) as r:
-                          return e if r.status == 200 else None
+                          return r.status
+                  except urllib.error.HTTPError as ex:
+                      return ex.code
                   except Exception:
-                      return None
+                      return 0
+              ok = 0
+              for e in sample:
+                  s = check(e)
+                  statussen[s] = statussen.get(s, 0) + 1
+                  if s == 200:
+                      ok += 1
+                  time.sleep(0.4)
+              log(f"steekproef: {ok}/{len(sample)} foto's ok; statuscodes: {statussen}")
 
-              checked = []
-              if entries:
-                  with ThreadPoolExecutor(max_workers=12) as ex:
-                      checked = [e for e in ex.map(check, entries) if e]
-              log(f"{len(checked)} foto's bestaan echt ({len(entries) - len(checked)} afgekeurd)")
-
-              photos = [MONT_BLANC] + checked
+              photos = [MONT_BLANC] + entries
               if len(photos) < 100:
                   log(f"Slechts {len(photos)} bergen — photos.js wordt NIET geschreven.")
+                  return
+              if len(sample) >= 20 and ok < len(sample) * 0.5:
+                  log("Steekproef te slecht — photos.js wordt NIET geschreven.")
                   return
 
               with open("photos.js", "w", encoding="utf-8") as f:
