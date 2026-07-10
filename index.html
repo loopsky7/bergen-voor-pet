@@ -182,7 +182,7 @@ function render(list) {
       de browser — Wikidata staat dit toe). Gesorteerd op
       bekendheid; met naam, land, hoogte en eigen foto.
    ============================================================ */
-const CACHE_KEY = "bergen_voor_pet_v1";
+const CACHE_KEY = "bergen_voor_pet_v2";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 30; // 30 dagen
 
 const SPARQL = `
@@ -202,7 +202,7 @@ SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
     }
     GROUP BY ?m ?fame
     ORDER BY DESC(?fame)
-    LIMIT 500
+    LIMIT 3000
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }
 }
@@ -230,7 +230,7 @@ function toPhoto(b) {
 async function fetchFromWikidata() {
   const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(SPARQL);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => controller.abort(), 60000);
   let rows;
   try {
     const res = await fetch(url, { headers: { "Accept": "application/sparql-results+json" }, signal: controller.signal });
