@@ -129,24 +129,99 @@ const MONT_BLANC = {
   caption: "Mont Blanc, Frankrijk/Italië — 4.806 m. Het dak van West-Europa. Hier heeft onze pet op de top gestaan!"
 };
 
+/* Vaste lijst: ~75 beroemde bergen, ingebakken in de pagina zelf.
+   Deze werken ALTIJD, ook zonder Wikidata. Foto's die onverhoopt niet
+   bestaan verdwijnen vanzelf (zie de error-afhandeling hieronder). */
+function cf(file) {
+  return "https://commons.wikimedia.org/wiki/Special:FilePath/" +
+         encodeURIComponent(file) + "?width=1400";
+}
 const FALLBACK = [
   MONT_BLANC,
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Matterhorn%20reflection.jpg?width=1400",
-    caption: "De Matterhorn, Zwitserland — 4.478 m, weerspiegeld in de Riffelsee" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Everest%2C%20Nepal%2C%20Himalayas.jpg?width=1400",
-    caption: "Mount Everest, Nepal/Tibet — 8.849 m, de hoogste berg ter wereld" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/K2%208611.jpg?width=1400",
-    caption: "K2, Pakistan/China — 8.611 m, de op één na hoogste berg ter wereld" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Mount%20Kilimanjaro.jpg?width=1600",
-    caption: "Kilimanjaro, Tanzania — 5.895 m, het dak van Afrika" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Lake%20Kawaguchiko%20Sakura%20Mount%20Fuji%204.JPG?width=1400",
-    caption: "Mount Fuji, Japan — 3.776 m" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Eiger%2CM%C3%B6nch%2CJungfrau2.JPG?width=1400",
-    caption: "Eiger, Mönch en Jungfrau, Zwitserland" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Ama%20Dablam%20from%20Kala%20Patthar.jpg?width=1400",
-    caption: "Ama Dablam, Nepal — 6.812 m" },
-  { src: "https://commons.wikimedia.org/wiki/Special:FilePath/Drei%20Zinnen%20Tre%20Cime%20di%20Lavaredo%20Dolomites.jpg?width=1400",
-    caption: "Tre Cime di Lavaredo, Dolomieten, Italië — 2.999 m" },
+  { src: cf("Massif du Mont-Blanc and river.jpg"), caption: "Het Mont Blanc-massief, gezien vanuit Val Ferret (Italië)" },
+  { src: cf("Matterhorn reflection.jpg"), caption: "Matterhorn, Zwitserland — 4.478 m, weerspiegeld in de Riffelsee" },
+  { src: cf("Zermatt and Matterhorn.jpg"), caption: "Zermatt aan de voet van de Matterhorn, Zwitserland" },
+  { src: cf("Mount Everest, Nepal, Himalayas.jpg"), caption: "Mount Everest, Nepal/Tibet — 8.849 m, de hoogste berg ter wereld" },
+  { src: cf("Everest panorama from Kala Patthar.jpg"), caption: "Panorama van de Everest, gezien vanaf Kala Patthar, Nepal" },
+  { src: cf("K2 8611.jpg"), caption: "K2, Pakistan/China — 8.611 m, de op één na hoogste berg ter wereld" },
+  { src: cf("Kangchenjunga.jpg"), caption: "Kangchenjunga, Nepal/India — 8.586 m, de derde hoogste berg ter wereld" },
+  { src: cf("Lhotse-fromChukhungRi.jpg"), caption: "Lhotse, Nepal/Tibet — 8.516 m" },
+  { src: cf("Makalu.jpg"), caption: "Makalu, Nepal/Tibet — 8.485 m" },
+  { src: cf("Cho Oyu.jpg"), caption: "Cho Oyu, Nepal/Tibet — 8.188 m" },
+  { src: cf("Dhaulagiri.jpg"), caption: "Dhaulagiri, Nepal — 8.167 m, 'de witte berg'" },
+  { src: cf("Manaslu.jpg"), caption: "Manaslu, Nepal — 8.163 m, 'de berg van de geest'" },
+  { src: cf("Nanga parbat.jpg"), caption: "Nanga Parbat, Pakistan — 8.126 m" },
+  { src: cf("Annapurna South Face.jpg"), caption: "Annapurna, Nepal — 8.091 m" },
+  { src: cf("Gasherbrum I.jpg"), caption: "Gasherbrum I, Pakistan/China — 8.080 m" },
+  { src: cf("Broad Peak.jpg"), caption: "Broad Peak, Pakistan/China — 8.051 m" },
+  { src: cf("Shishapangma.jpg"), caption: "Shishapangma, Tibet — 8.027 m" },
+  { src: cf("Rakaposhi.jpg"), caption: "Rakaposhi, Pakistan — 7.788 m" },
+  { src: cf("Tirich Mir.jpg"), caption: "Tirich Mir, Pakistan — 7.708 m" },
+  { src: cf("Khan Tengri.jpg"), caption: "Khan Tengri, Kazachstan/Kirgizië/China — 7.010 m" },
+  { src: cf("Machapuchare.jpg"), caption: "Machapuchare, Nepal — 6.993 m, 'de vissenstaart'" },
+  { src: cf("Ama Dablam from Kala Patthar.jpg"), caption: "Ama Dablam, Nepal — 6.812 m, 'de moeder met het halssieraad'" },
+  { src: cf("Mount Kailash.jpg"), caption: "Kailash, Tibet — 6.638 m, heilige berg" },
+  { src: cf("Aconcagua2016.jpg"), caption: "Aconcagua, Argentinië — 6.961 m, het dak van Zuid-Amerika" },
+  { src: cf("Huascaran.jpg"), caption: "Huascarán, Peru — 6.768 m, het dak van Peru" },
+  { src: cf("Alpamayo.jpg"), caption: "Alpamayo, Peru — 5.947 m, ooit verkozen tot mooiste berg ter wereld" },
+  { src: cf("Chimborazo.jpg"), caption: "Chimborazo, Ecuador — 6.263 m, het verste punt vanaf het middelpunt van de aarde" },
+  { src: cf("Cotopaxi.jpg"), caption: "Cotopaxi, Ecuador — 5.897 m" },
+  { src: cf("Denali Mt McKinley.jpg"), caption: "Denali, Verenigde Staten (Alaska) — 6.190 m, het dak van Noord-Amerika" },
+  { src: cf("Mount Kilimanjaro.jpg"), caption: "Kilimanjaro, Tanzania — 5.895 m, het dak van Afrika" },
+  { src: cf("Mount Kenya.jpg"), caption: "Mount Kenya, Kenia — 5.199 m" },
+  { src: cf("Mount Elbrus.jpg"), caption: "Elbroes, Rusland — 5.642 m, de hoogste berg van Europa" },
+  { src: cf("Damavand in winter.jpg"), caption: "Damavand, Iran — 5.610 m, de hoogste vulkaan van Azië" },
+  { src: cf("Mount Ararat.jpg"), caption: "Ararat, Turkije — 5.137 m, de berg van de ark van Noach" },
+  { src: cf("Popocatepetl.jpg"), caption: "Popocatépetl, Mexico — 5.426 m" },
+  { src: cf("Pico de Orizaba.jpg"), caption: "Pico de Orizaba, Mexico — 5.636 m, de hoogste berg van Mexico" },
+  { src: cf("Vinson Massif.jpg"), caption: "Mount Vinson, Antarctica — 4.892 m, het dak van Antarctica" },
+  { src: cf("Puncakjaya.jpg"), caption: "Puncak Jaya, Indonesië — 4.884 m, het dak van Oceanië" },
+  { src: cf("Monte Rosa summit as seen from Gornergrat.jpg"), caption: "Monte Rosa, Zwitserland/Italië — 4.634 m" },
+  { src: cf("Weisshorn.jpg"), caption: "Weisshorn, Zwitserland — 4.506 m" },
+  { src: cf("Mount Whitney.jpg"), caption: "Mount Whitney, Verenigde Staten — 4.421 m" },
+  { src: cf("Mount Rainier 5917s.JPG"), caption: "Mount Rainier, Verenigde Staten — 4.392 m" },
+  { src: cf("Mount Shasta.jpg"), caption: "Mount Shasta, Verenigde Staten — 4.322 m" },
+  { src: cf("Grandes Jorasses.jpg"), caption: "Grandes Jorasses, Frankrijk/Italië — 4.208 m" },
+  { src: cf("Grand Teton.jpg"), caption: "Grand Teton, Verenigde Staten — 4.199 m" },
+  { src: cf("Jungfrau.jpg"), caption: "Jungfrau, Zwitserland — 4.158 m" },
+  { src: cf("Eiger,Mönch,Jungfrau2.JPG"), caption: "Eiger (3.967 m), Mönch (4.107 m) en Jungfrau (4.158 m), Zwitserland" },
+  { src: cf("Toubkal.jpg"), caption: "Toubkal, Marokko — 4.167 m, het dak van Noord-Afrika" },
+  { src: cf("Mount Kinabalu.jpg"), caption: "Kinabalu, Maleisië — 4.095 m" },
+  { src: cf("Barre des Ecrins.jpg"), caption: "Barre des Écrins, Frankrijk — 4.102 m" },
+  { src: cf("Gran Paradiso.jpg"), caption: "Gran Paradiso, Italië — 4.061 m" },
+  { src: cf("Piz Bernina.jpg"), caption: "Piz Bernina, Zwitserland — 4.049 m, de hoogste top van de oostelijke Alpen" },
+  { src: cf("Ortler.jpg"), caption: "Ortler, Italië — 3.905 m" },
+  { src: cf("Grossglockner.jpg"), caption: "Grossglockner, Oostenrijk — 3.798 m, de hoogste berg van Oostenrijk" },
+  { src: cf("Lake Kawaguchiko Sakura Mount Fuji 4.JPG"), caption: "Mount Fuji, Japan — 3.776 m, met kersenbloesem aan het Kawaguchi-meer" },
+  { src: cf("Aoraki Mount Cook.JPG"), caption: "Aoraki / Mount Cook, Nieuw-Zeeland — 3.724 m" },
+  { src: cf("Teide.jpg"), caption: "Teide, Spanje (Tenerife) — 3.718 m, de hoogste berg van Spanje" },
+  { src: cf("Mount Hood reflected in Mirror Lake, Oregon.jpg"), caption: "Mount Hood, Verenigde Staten — 3.429 m" },
+  { src: cf("Fitz Roy.jpg"), caption: "Fitz Roy, Argentinië/Chili — 3.405 m, Patagonië" },
+  { src: cf("Mt Etna and Catania1.jpg"), caption: "Etna, Italië (Sicilië) — 3.357 m, de hoogste vulkaan van Europa" },
+  { src: cf("Cerro Torre.jpg"), caption: "Cerro Torre, Argentinië/Chili — 3.128 m, Patagonië" },
+  { src: cf("Drei Zinnen Tre Cime di Lavaredo Dolomites.jpg"), caption: "Tre Cime di Lavaredo, Dolomieten, Italië — 2.999 m" },
+  { src: cf("Via Lattea e Tre Cime di Lavaredo Panorama.jpg"), caption: "De Melkweg boven de Tre Cime di Lavaredo, Italië" },
+  { src: cf("Zugspitze.jpg"), caption: "Zugspitze, Duitsland — 2.962 m, de hoogste berg van Duitsland" },
+  { src: cf("Mount Olympus.jpg"), caption: "Olympus, Griekenland — 2.917 m, de berg van de goden" },
+  { src: cf("Triglav.jpg"), caption: "Triglav, Slovenië — 2.864 m" },
+  { src: cf("Villarrica Volcano.jpg"), caption: "Villarrica, Chili — 2.847 m" },
+  { src: cf("Mount Ruapehu.jpg"), caption: "Ruapehu, Nieuw-Zeeland — 2.797 m" },
+  { src: cf("Baitou Mountain Tianchi.jpg"), caption: "Paektusan met het Hemelmeer, Noord-Korea/China — 2.744 m" },
+  { src: cf("Watzmann.jpg"), caption: "Watzmann, Duitsland — 2.713 m" },
+  { src: cf("Half Dome from Glacier Point, Yosemite NP - Diliff.jpg"), caption: "Half Dome, Yosemite, Verenigde Staten — 2.694 m" },
+  { src: cf("Tunnel View, Yosemite Valley, Yosemite NP - Diliff.jpg"), caption: "Yosemite-vallei met El Capitan, Verenigde Staten" },
+  { src: cf("Gerlachovský štít.jpg"), caption: "Gerlachovský štít, Slowakije — 2.655 m, het dak van de Tatra" },
+  { src: cf("MSH82 st helens plume from harrys ridge 05-19-82.jpg"), caption: "Mount St. Helens, Verenigde Staten — 2.549 m, tijdens de uitbarsting van 1982" },
+  { src: cf("Mount Taranaki.jpg"), caption: "Taranaki, Nieuw-Zeeland — 2.518 m" },
+  { src: cf("Galdhøpiggen.jpg"), caption: "Galdhøpiggen, Noorwegen — 2.469 m, het dak van Scandinavië" },
+  { src: cf("Cuernos del Paine from Lake Pehoé.jpg"), caption: "Cuernos del Paine, Chili — Torres del Paine, Patagonië" },
+  { src: cf("Kebnekaise.jpg"), caption: "Kebnekaise, Zweden — 2.096 m, de hoogste berg van Zweden" },
+  { src: cf("Mayon Volcano.jpg"), caption: "Mayon, Filipijnen — 2.463 m, de volmaakte kegel" },
+  { src: cf("Mount Bromo.jpg"), caption: "Bromo, Indonesië — 2.329 m" },
+  { src: cf("Ben Nevis.jpg"), caption: "Ben Nevis, Schotland — 1.345 m, de hoogste berg van Groot-Brittannië" },
+  { src: cf("Vesuvius from Pompeii (hires version 2 scaled).png"), caption: "Vesuvius, Italië — 1.281 m, gezien vanuit Pompeï" },
+  { src: cf("Table Mountain DanieVDM.jpg"), caption: "Tafelberg, Zuid-Afrika — 1.085 m" },
+  { src: cf("Snowdon.jpg"), caption: "Snowdon, Wales — 1.085 m" },
 ];
 
 /* ============================================================
@@ -159,6 +234,9 @@ let observer = null;
 function render(list) {
   if (observer) observer.disconnect();
   album.textContent = "";
+  let getoond = list.length;
+  const teller = document.getElementById("teller");
+  const zetTeller = () => { teller.textContent = nlHeight(getoond) + " bergen"; };
 
   for (const photo of list) {
     const fig = document.createElement("figure");
@@ -167,7 +245,8 @@ function render(list) {
     img.alt = photo.caption || "Berg";
     img.loading = "lazy";        // foto's laden pas bij het scrollen — honderden blijven snel
     img.draggable = false;
-    img.addEventListener("error", () => { fig.remove(); }); // stille foto's weglaten
+    // kapotte foto's stilletjes weglaten én de teller bijwerken
+    img.addEventListener("error", () => { fig.remove(); getoond--; zetTeller(); });
     fig.appendChild(img);
     if (photo.caption) {
       const cap = document.createElement("figcaption");
@@ -183,7 +262,7 @@ function render(list) {
   document.querySelectorAll("figure").forEach(f => observer.observe(f));
 
   /* Klein tellertje onderaan: zo zie je hoeveel bergen er geladen zijn. */
-  document.getElementById("teller").textContent = nlHeight(list.length) + " bergen";
+  zetTeller();
 }
 
 /* ============================================================
@@ -191,10 +270,19 @@ function render(list) {
       de browser — Wikidata staat dit toe). Gesorteerd op
       bekendheid; met naam, land, hoogte en eigen foto.
    ============================================================ */
-const CACHE_KEY = "bergen_voor_pet_v3";
+const CACHE_KEY = "bergen_voor_pet_v4";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 30; // 30 dagen
 
-function sparqlFor(limit) {
+/* Drie pogingen, van groot naar klein en steeds eenvoudiger.
+   Geen "P279*"-boomzoektocht meer — dat was te zwaar en liep vast op de
+   tijdslimiet van Wikidata. Nu: directe klassen + een bekendheidsdrempel. */
+const POGINGEN = [
+  { limit: 3000, classes: "wd:Q8502 wd:Q8072 wd:Q169358", minFame: 4 },
+  { limit: 1200, classes: "wd:Q8502 wd:Q8072",            minFame: 10 },
+  { limit: 400,  classes: "wd:Q8502",                     minFame: 25 },
+];
+
+function sparqlFor(p) {
   return `
 SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
   {
@@ -203,16 +291,17 @@ SELECT ?m ?mLabel ?elevation ?image ?fame ?countryLabel WHERE {
            (SAMPLE(?img) AS ?image)
            (SAMPLE(?c)   AS ?country)
     WHERE {
-      VALUES ?root { wd:Q8502 wd:Q8072 }
-      ?m wdt:P31/wdt:P279* ?root .
+      VALUES ?class { ${p.classes} }
+      ?m wdt:P31 ?class .
+      ?m wikibase:sitelinks ?fame .
+      FILTER(?fame >= ${p.minFame})
       ?m wdt:P2044 ?elev .
       ?m wdt:P18   ?img .
-      ?m wikibase:sitelinks ?fame .
       OPTIONAL { ?m wdt:P17 ?c . }
     }
     GROUP BY ?m ?fame
     ORDER BY DESC(?fame)
-    LIMIT ${limit}
+    LIMIT ${p.limit}
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }
 }
@@ -238,8 +327,8 @@ function toPhoto(b) {
   return { src, caption, key: name.toLowerCase() };
 }
 
-async function fetchFromWikidata(limit) {
-  const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(sparqlFor(limit));
+async function fetchFromWikidata(poging) {
+  const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(sparqlFor(poging));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   let rows;
@@ -276,17 +365,17 @@ async function start() {
   render(cached || FALLBACK);   // meteen iets tonen
   if (cached) return;           // recente lijst? klaar, geen netwerk nodig
 
-  /* Eerst de grote lijst proberen; lukt dat niet, dan een kleinere. */
-  for (const limit of [3000, 800]) {
+  /* Eerst de grote lijst proberen; lukt dat niet, dan steeds kleiner. */
+  for (const poging of POGINGEN) {
     try {
-      const list = await fetchFromWikidata(limit);
-      if (list.length > 40) {
+      const list = await fetchFromWikidata(poging);
+      if (list.length > FALLBACK.length) {
         render(list);
         try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
         return;
       }
     } catch (e) {
-      /* volgende poging, of het vangnet blijft staan */
+      /* volgende poging, of de vaste lijst blijft staan */
     }
   }
 }
