@@ -175,6 +175,15 @@ function nlHeight(m) {
   return String(Math.round(m)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
+/* Op telefoons kleinere foto's vragen: sneller en zuiniger met data. */
+const SCHERM = Math.round(((window.screen && window.screen.width) || 1000) * (window.devicePixelRatio || 1));
+const FOTO_BREEDTE = SCHERM <= 1000 ? 800 : 1400;
+function metBreedte(src, extra) {
+  let u = src.replace(/([?&])width=\d+/, "$1width=" + FOTO_BREEDTE);
+  if (extra) u += "&p=" + extra;
+  return u;
+}
+
 function render(list) {
   if (observer) observer.disconnect();
   album.textContent = "";
@@ -185,12 +194,21 @@ function render(list) {
   for (const photo of list) {
     const fig = document.createElement("figure");
     const img = document.createElement("img");
-    img.src = photo.src;
+    img.src = metBreedte(photo.src);
     img.alt = photo.caption || "Berg";
     img.loading = "lazy";        // foto's laden pas bij het scrollen — honderden blijven snel
     img.draggable = false;
-    // kapotte foto's stilletjes weglaten én de teller bijwerken
-    img.addEventListener("error", () => { fig.remove(); getoond--; zetTeller(); });
+    // Mislukte foto's een paar keer opnieuw proberen (mobiel netwerk hapert
+    // weleens); pas na 3 mislukte pogingen stilletjes weglaten.
+    let pogingen = 0;
+    img.addEventListener("error", () => {
+      pogingen++;
+      if (pogingen <= 3) {
+        setTimeout(() => { img.src = metBreedte(photo.src, pogingen); }, pogingen * 4000);
+      } else {
+        fig.remove(); getoond--; zetTeller();
+      }
+    });
     fig.appendChild(img);
     if (photo.caption) {
       const cap = document.createElement("figcaption");
@@ -214,8 +232,27 @@ function render(list) {
       foto gecontroleerd door de GitHub-workflow). Ontbreekt dat
       bestand nog, dan toont de pagina de vaste lijst hierboven.
    ============================================================ */
-const lijst = (window.PHOTOS && window.PHOTOS.length > 0) ? window.PHOTOS : FALLBACK;
-render(lijst);
+if (window.PHOTOS && window.PHOTOS.length > 0) {
+  render(window.PHOTOS);
+} else {
+  /* photos.js is (nog) niet geladen — toon alvast de vaste lijst en blijf
+     op de achtergrond proberen de volledige lijst binnen te halen. */
+  render(FALLBACK);
+  let n = 0;
+  const probeer = () => {
+    n++;
+    fetch("photos.js", { cache: "no-cache" })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(t => {
+        const lijst = JSON.parse(t.slice(t.indexOf("["), t.lastIndexOf("]") + 1));
+        if (lijst.length > FALLBACK.length) render(lijst);
+        else if (n < 5) setTimeout(probeer, n * 5000);
+      })
+      .catch(() => { if (n < 5) setTimeout(probeer, n * 5000); });
+  };
+  setTimeout(probeer, 1500);
+  window.addEventListener("online", () => { n = 0; probeer(); });
+}
 </script>
 </body>
 </html>
